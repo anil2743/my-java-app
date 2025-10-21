@@ -1,0 +1,152 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #ecf0f1;
+    color: #2c3e50;
+}
+
+.registrations {
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    width: 100%;
+    min-height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: #34495e;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px 10px 0 0;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.filters {
+    display: flex;
+    gap: 20px;
+    padding: 20px 0;
+    background: #f9f9f9;
+    position: sticky;
+    top: 54px;
+    z-index: 900;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    margin-bottom: 8px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+select, input[type="date"], input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.table-wrapper {
+    flex: 1;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    overflow-y: auto; /* Enable vertical scrolling */
+    max-height: calc(100vh - 138px); /* Adjust based on header + filters height */
+    -ms-overflow-style: none; /* Hide horizontal scrollbar in IE/Edge */
+    scrollbar-width: thin; /* Thin vertical scrollbar for Firefox */
+    scrollbar-color: #34495e #ecf0f1; /* Vertical scrollbar color for Firefox */
+}
+
+.table-wrapper::-webkit-scrollbar {
+    width: 6px; /* Thin vertical scrollbar width */
+    height: 0; /* Hide horizontal scrollbar completely */
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background-color: #34495e; /* Vertical scrollbar thumb color */
+    border-radius: 10px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #ecf0f1; /* Vertical scrollbar track color */
+}
+
+.table-wrapper::-webkit-scrollbar:horizontal {
+    height: 0; /* Explicitly hide horizontal scrollbar in Webkit */
+}
+
+table {
+    width: 100%;
+    min-width: 1200px; /* Ensures horizontal scrolling if needed */
+    border-collapse: collapse;
+}
+
+thead {
+    background: #2c3e50;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 800;
+}
+
+thead th {
+    padding: 15px;
+    text-align: center;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    white-space: nowrap;
+}
+
+tbody tr {
+    border-bottom: 1px solid #ddd;
+}
+
+tbody td {
+    padding: 12px;
+    text-align: center;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    white-space: nowrap;
+    color: #2c3e50;
+}
+
+/* Explicit column widths */
+thead th:nth-child(1), tbody td:nth-child(1) { width: 10%; }
+thead th:nth-child(2), tbody td:nth-child(2) { width: 15%; }
+thead th:nth-child(3), tbody td:nth-child(3) { width: 20%; }
+thead th:nth-child(4), tbody td:nth-child(4) { width: 15%; }
+thead th:nth-child(5), tbody td:nth-child(5) { width: 10%; }
+thead th:nth-child(6), tbody td:nth-child(6) { width: 15%; }
+thead th:nth-child(7), tbody td:nth-child(7) { width: 15%; }
+thead th:nth-child(8), tbody td:nth-child(8) { width: 10%; }
+
+/* Debug: Highlight Attempts column */
+tbody td:nth-child(8) {
+    background-color: #fff;
+    color: #000;
+}
+
+.error-message {
+    color: red;
+    padding: 10px;
+    text-align: center;
+}
