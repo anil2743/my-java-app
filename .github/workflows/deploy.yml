@@ -1,0 +1,123 @@
+name: CI/CD Deploy Java App to Tomcat10 on EC2
+
+on:
+  push:
+    branches:
+      - staging
+      - master
+  pull_request:
+    branches:
+      - staging
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1 Checkout your repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2 Setup Java 17
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 3 Build WAR file
+      - name: Build WAR file
+        run: mvn clean package -DskipTests
+
+      # 4 Verify WAR file exists
+      - name: Verify WAR file
+        run: |
+          echo "=== Listing target directory ==="
+          ls -la target/
+          
+          echo "=== Checking for WAR files ==="
+          if ls target/*.war 1> /dev/null 2>&1; then
+            echo "Found WAR files:"
+            ls -la target/*.war
+            WAR_FILE=$(ls target/*.war | head -1)
+            echo "WAR file: $WAR_FILE"
+            
+            # Verify it's a file, not directory
+            if [ -d "$WAR_FILE" ]; then
+              echo "ERROR: $WAR_FILE is a directory, not a file!"
+              exit 1
+            fi
+            
+            # Copy to a known location with correct name
+            cp "$WAR_FILE" ./ROOT.war
+            echo "WAR_FILE copied to ./ROOT.war"
+          else
+            echo "ERROR: No WAR files found in target directory"
+            exit 1
+          fi
+
+      # 5 Create SSH key file
+      - name: Create SSH key file
+        run: |
+          # Create SSH key file
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      # 6 Deploy to Staging (only on push to staging)
+      - name: Deploy to Staging
+        if: github.ref == 'refs/heads/staging'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "=== Cleaning up Staging ==="
+            sudo rm -rf /var/lib/tomcat10/webapps/staging
+            
+            echo "=== Creating Staging Directory ==="
+            sudo mkdir -p /var/lib/tomcat10/webapps/staging
+            sudo chmod 777 /var/lib/tomcat10/webapps/staging
+            
+            echo "=== Uploading WAR to Staging ==="
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging/ROOT.war
+            
+            echo "=== Setting permissions ==="
+            sudo chown -R tomcat:tomcat /var/lib/tomcat10/webapps/staging
+            sudo chmod -R 755 /var/lib/tomcat10/webapps/staging
+            
+            echo "=== Restarting Tomcat ==="
+            sudo systemctl restart tomcat10
+            
+            echo "=== Verifying Staging Deployment ==="
+            ls -la /var/lib/tomcat10/webapps/staging
+            sudo systemctl status tomcat10 --no-pager
+
+      # 7 Deploy to Production (only on push to main)
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "=== Cleaning up Production ==="
+            sudo rm -rf /var/lib/tomcat10/webapps/ROOT*
+            
+            echo "=== Uploading WAR to Production ==="
+            scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/ROOT.war
+            
+            echo "=== Setting permissions ==="
+            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/ROOT.war
+            sudo chmod 644 /var/lib/tomcat10/webapps/ROOT.war
+            
+            echo "=== Restarting Tomcat ==="
+            sudo systemctl restart tomcat10
+            
+            echo "=== Verifying Production Deployment ==="
+            ls -la /var/lib/tomcat10/webapps/
+            sudo systemctl status tomcat10 --no-pager
