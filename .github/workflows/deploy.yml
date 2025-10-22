@@ -1,6 +1,6 @@
 name: CI/CD Deploy Java App to Tomcat10 on EC2
 
-# Trigger deployment on push to staging or main, and on PR to staging
+# Trigger deployment on push to staging or master, and on PR to staging
 on:
   push:
     branches:
@@ -42,7 +42,7 @@ jobs:
             echo "Found WAR files:"
             ls -la target/*.war
             WAR_FILE=$(ls target/*.war | head -1)
-            echo "WAR file: $WAR_FILE"
+            echo "WAR_FILE: $WAR_FILE"
             
             # Verify it's a file, not directory
             if [ -d "$WAR_FILE" ]; then
@@ -58,7 +58,7 @@ jobs:
             exit 1
           fi
 
-      # 5 Upload WAR artifact for deployment jobs (Updated to v4)
+      # 5 Upload WAR artifact for deployment jobs
       - name: Upload WAR artifact
         uses: actions/upload-artifact@v4
         with:
@@ -72,7 +72,7 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     
     steps:
-      # 1 Download WAR artifact (Updated to v4)
+      # 1 Download WAR artifact
       - name: Download WAR artifact
         uses: actions/download-artifact@v4
         with:
@@ -95,13 +95,11 @@ jobs:
           script: |
             echo "=== Starting Staging Deployment ==="
             
-            # Clean up staging directory
-            echo "1. Cleaning up staging directory..."
+            # Clean up any existing staging artifacts
+            echo "1. Cleaning up staging artifacts..."
             sudo rm -rf /var/lib/tomcat10/webapps/staging*
-            sudo mkdir -p /var/lib/tomcat10/webapps/staging
-            sudo chmod 777 /var/lib/tomcat10/webapps/staging
             
-            # Upload WAR file as staging.war (not ROOT.war)
+            # Upload WAR file as staging.war
             echo "2. Uploading WAR file to staging..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
               ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging.war
@@ -130,7 +128,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     
     steps:
-      # 1 Download WAR artifact (Updated to v4)
+      # 1 Download WAR artifact
       - name: Download WAR artifact
         uses: actions/download-artifact@v4
         with:
@@ -153,8 +151,8 @@ jobs:
           script: |
             echo "=== Starting Production Deployment ==="
             
-            # Clean up production directory
-            echo "1. Cleaning up production directory..."
+            # Clean up any existing production artifacts
+            echo "1. Cleaning up production artifacts..."
             sudo rm -rf /var/lib/tomcat10/webapps/ROOT*
             
             # Upload WAR file as ROOT.war
