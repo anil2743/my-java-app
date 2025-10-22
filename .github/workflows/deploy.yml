@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - staging
-      - main
+      - master
   pull_request:
     branches:
       - staging
@@ -18,11 +18,11 @@ jobs:
     steps:
       # 1 Checkout your repo
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2 Setup Java 17
       - name: Set up Java 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
@@ -58,9 +58,9 @@ jobs:
             exit 1
           fi
 
-      # 5 Upload WAR artifact for deployment jobs
+      # 5 Upload WAR artifact for deployment jobs (Updated to v4)
       - name: Upload WAR artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: war-file
           path: ./ROOT.war
@@ -72,9 +72,9 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     
     steps:
-      # 1 Download WAR artifact
+      # 1 Download WAR artifact (Updated to v4)
       - name: Download WAR artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: war-file
           
@@ -101,19 +101,15 @@ jobs:
             sudo mkdir -p /var/lib/tomcat10/webapps/staging
             sudo chmod 777 /var/lib/tomcat10/webapps/staging
             
-            # Copy WAR to staging
-            echo "2. Copying WAR to staging..."
-            sudo cp /dev/null /var/lib/tomcat10/webapps/staging/ROOT.war
-            sudo chmod 666 /var/lib/tomcat10/webapps/staging/ROOT.war
-            
-            # Upload WAR file
+            # Upload WAR file as staging.war (not ROOT.war)
+            echo "2. Uploading WAR file to staging..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
-              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging/ROOT.war
+              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging.war
             
             # Set permissions
             echo "3. Setting permissions..."
-            sudo chown -R tomcat:tomcat /var/lib/tomcat10/webapps/staging
-            sudo chmod -R 755 /var/lib/tomcat10/webapps/staging
+            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/staging.war
+            sudo chmod 644 /var/lib/tomcat10/webapps/staging.war
             
             # Restart Tomcat
             echo "4. Restarting Tomcat..."
@@ -122,7 +118,7 @@ jobs:
             # Verify deployment
             echo "5. Verifying deployment..."
             sleep 10
-            ls -la /var/lib/tomcat10/webapps/staging/
+            ls -la /var/lib/tomcat10/webapps/
             sudo systemctl status tomcat10 --no-pager
             
             echo "=== Staging Deployment Completed ==="
@@ -131,12 +127,12 @@ jobs:
     name: Deploy to Production
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     
     steps:
-      # 1 Download WAR artifact
+      # 1 Download WAR artifact (Updated to v4)
       - name: Download WAR artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: war-file
           
@@ -161,12 +157,8 @@ jobs:
             echo "1. Cleaning up production directory..."
             sudo rm -rf /var/lib/tomcat10/webapps/ROOT*
             
-            # Copy WAR to production
-            echo "2. Copying WAR to production..."
-            sudo cp /dev/null /var/lib/tomcat10/webapps/ROOT.war
-            sudo chmod 666 /var/lib/tomcat10/webapps/ROOT.war
-            
-            # Upload WAR file
+            # Upload WAR file as ROOT.war
+            echo "2. Uploading WAR file to production..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
               ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/ROOT.war
             
