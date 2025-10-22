@@ -1,5 +1,6 @@
 name: CI/CD Deploy Java App to Tomcat10 on EC2
 
+# Trigger deployment on push to staging or main, and on PR to staging
 on:
   push:
     branches:
@@ -10,7 +11,8 @@ on:
       - staging
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build WAR
     runs-on: ubuntu-latest
 
     steps:
@@ -56,68 +58,123 @@ jobs:
             exit 1
           fi
 
-      # 5 Create SSH key file
+      # 5 Upload WAR artifact for deployment jobs
+      - name: Upload WAR artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: war-file
+          path: ./ROOT.war
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+      # 1 Download WAR artifact
+      - name: Download WAR artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: war-file
+          
+      # 2 Create SSH key file
       - name: Create SSH key file
         run: |
-          # Create SSH key file
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      # 6 Deploy to Staging (only on push to staging)
+      # 3 Deploy to Staging
       - name: Deploy to Staging
-        if: github.ref == 'refs/heads/staging'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "=== Cleaning up Staging ==="
-            sudo rm -rf /var/lib/tomcat10/webapps/staging
+            echo "=== Starting Staging Deployment ==="
             
-            echo "=== Creating Staging Directory ==="
+            # Clean up staging directory
+            echo "1. Cleaning up staging directory..."
+            sudo rm -rf /var/lib/tomcat10/webapps/staging*
             sudo mkdir -p /var/lib/tomcat10/webapps/staging
             sudo chmod 777 /var/lib/tomcat10/webapps/staging
             
-            echo "=== Uploading WAR to Staging ==="
+            # Upload WAR file as staging.war (not ROOT.war)
+            echo "2. Uploading WAR file to staging..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
-              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging/ROOT.war
+              ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging.war
             
-            echo "=== Setting permissions ==="
-            sudo chown -R tomcat:tomcat /var/lib/tomcat10/webapps/staging
-            sudo chmod -R 755 /var/lib/tomcat10/webapps/staging
+            # Set permissions
+            echo "3. Setting permissions..."
+            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/staging.war
+            sudo chmod 644 /var/lib/tomcat10/webapps/staging.war
             
-            echo "=== Restarting Tomcat ==="
+            # Restart Tomcat
+            echo "4. Restarting Tomcat..."
             sudo systemctl restart tomcat10
             
-            echo "=== Verifying Staging Deployment ==="
-            ls -la /var/lib/tomcat10/webapps/staging
+            # Verify deployment
+            echo "5. Verifying deployment..."
+            sleep 10
+            ls -la /var/lib/tomcat10/webapps/
             sudo systemctl status tomcat10 --no-pager
+            
+            echo "=== Staging Deployment Completed ==="
 
-      # 7 Deploy to Production (only on push to main)
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      # 1 Download WAR artifact
+      - name: Download WAR artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: war-file
+          
+      # 2 Create SSH key file
+      - name: Create SSH key file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      # 3 Deploy to Production
       - name: Deploy to Production
-        if: github.ref == 'refs/heads/main'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "=== Cleaning up Production ==="
+            echo "=== Starting Production Deployment ==="
+            
+            # Clean up production directory
+            echo "1. Cleaning up production directory..."
             sudo rm -rf /var/lib/tomcat10/webapps/ROOT*
             
-            echo "=== Uploading WAR to Production ==="
+            # Upload WAR file as ROOT.war
+            echo "2. Uploading WAR file to production..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
               ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/ROOT.war
             
-            echo "=== Setting permissions ==="
+            # Set permissions
+            echo "3. Setting permissions..."
             sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/ROOT.war
             sudo chmod 644 /var/lib/tomcat10/webapps/ROOT.war
             
-            echo "=== Restarting Tomcat ==="
+            # Restart Tomcat
+            echo "4. Restarting Tomcat..."
             sudo systemctl restart tomcat10
             
-            echo "=== Verifying Production Deployment ==="
+            # Verify deployment
+            echo "5. Verifying deployment..."
+            sleep 10
             ls -la /var/lib/tomcat10/webapps/
             sudo systemctl status tomcat10 --no-pager
+            
+            echo "=== Production Deployment Completed ==="
