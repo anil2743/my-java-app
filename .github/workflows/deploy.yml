@@ -78,14 +78,30 @@ jobs:
         with:
           name: war-file
           
-      # 2 Create SSH key file
+      # 2 Verify WAR file was downloaded
+      - name: Verify WAR file
+        run: |
+          echo "=== Verifying downloaded WAR file ==="
+          ls -la
+          if [ ! -f "./ROOT.war" ]; then
+            echo "ERROR: ROOT.war not found!"
+            exit 1
+          fi
+          
+      # 3 Create SSH key file
       - name: Create SSH key file
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-      # 3 Deploy to Staging
+          
+      # 4 Test SSH connection
+      - name: Test SSH connection
+        run: |
+          echo "=== Testing SSH connection ==="
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+          
+      # 5 Deploy to Staging
       - name: Deploy to Staging
         uses: appleboy/ssh-action@master
         with:
@@ -95,28 +111,50 @@ jobs:
           script: |
             echo "=== Starting Staging Deployment ==="
             
+            # Check current directory and permissions
+            echo "1. Checking webapps directory..."
+            ls -la /var/lib/tomcat10/webapps/
+            
             # Clean up any existing staging artifacts
-            echo "1. Cleaning up staging artifacts..."
+            echo "2. Cleaning up staging artifacts..."
             sudo rm -rf /var/lib/tomcat10/webapps/staging*
             
+            # Check if cleanup was successful
+            echo "3. Verifying cleanup..."
+            ls -la /var/lib/tomcat10/webapps/
+            
+            # Set permissions for webapps directory
+            echo "4. Setting permissions..."
+            sudo chmod 777 /var/lib/tomcat10/webapps
+            
             # Upload WAR file as staging.war
-            echo "2. Uploading WAR file to staging..."
+            echo "5. Uploading WAR file to staging..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
               ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/staging.war
             
-            # Set permissions
-            echo "3. Setting permissions..."
+            # Verify upload
+            echo "6. Verifying upload..."
+            ls -la /var/lib/tomcat10/webapps/
+            
+            # Set permissions for WAR file
+            echo "7. Setting WAR file permissions..."
             sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/staging.war
             sudo chmod 644 /var/lib/tomcat10/webapps/staging.war
             
             # Restart Tomcat
-            echo "4. Restarting Tomcat..."
+            echo "8. Restarting Tomcat..."
             sudo systemctl restart tomcat10
             
+            # Wait for Tomcat to start
+            echo "9. Waiting for Tomcat to start..."
+            sleep 30
+            
             # Verify deployment
-            echo "5. Verifying deployment..."
-            sleep 10
+            echo "10. Verifying deployment..."
             ls -la /var/lib/tomcat10/webapps/
+            
+            # Check Tomcat status
+            echo "11. Checking Tomcat status..."
             sudo systemctl status tomcat10 --no-pager
             
             echo "=== Staging Deployment Completed ==="
@@ -155,24 +193,34 @@ jobs:
             echo "1. Cleaning up production artifacts..."
             sudo rm -rf /var/lib/tomcat10/webapps/ROOT*
             
+            # Set permissions for webapps directory
+            echo "2. Setting permissions..."
+            sudo chmod 777 /var/lib/tomcat10/webapps
+            
             # Upload WAR file as ROOT.war
-            echo "2. Uploading WAR file to production..."
+            echo "3. Uploading WAR file to production..."
             scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
               ./ROOT.war ubuntu@${{ secrets.EC2_HOST }}:/var/lib/tomcat10/webapps/ROOT.war
             
-            # Set permissions
-            echo "3. Setting permissions..."
+            # Set permissions for WAR file
+            echo "4. Setting WAR file permissions..."
             sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/ROOT.war
             sudo chmod 644 /var/lib/tomcat10/webapps/ROOT.war
             
             # Restart Tomcat
-            echo "4. Restarting Tomcat..."
+            echo "5. Restarting Tomcat..."
             sudo systemctl restart tomcat10
             
+            # Wait for Tomcat to start
+            echo "6. Waiting for Tomcat to start..."
+            sleep 30
+            
             # Verify deployment
-            echo "5. Verifying deployment..."
-            sleep 10
+            echo "7. Verifying deployment..."
             ls -la /var/lib/tomcat10/webapps/
+            
+            # Check Tomcat status
+            echo "8. Checking Tomcat status..."
             sudo systemctl status tomcat10 --no-pager
             
             echo "=== Production Deployment Completed ==="
